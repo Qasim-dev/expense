@@ -1,56 +1,54 @@
 import React from 'react';
-import Header from '../components/layout/Header';
-import Sidebar from '../components/layout/Sidebar';
+import PageShell from '../components/layout/PageShell';
+
+const faqs = [
+  {
+    question: 'How do I add an expense?',
+    answer: 'Use the “+ Add Expense” button on any ledger page, fill the form, and save. Entries sync automatically.',
+  },
+  {
+    question: 'Can I use the app offline?',
+    answer: 'Yes. We cache your data locally and sync to the server whenever you regain connectivity.',
+  },
+  {
+    question: 'How do I track a goal?',
+    answer: 'Visit the Goals page, set a target amount/date, and log contributions as you save.',
+  },
+];
 
 const Help = () => {
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
-
-  const faqs = [
-    {
-      question: 'How do I add an expense?',
-      answer: 'Click on the "+ Add Expense" button on the dashboard or All Expenses page, fill in the details, and click "Add Expense".',
-    },
-    {
-      question: 'Can I use the app offline?',
-      answer: 'Yes! The app works offline. All your data is stored locally and will sync when you come back online.',
-    },
-    {
-      question: 'How do I set up a goal?',
-      answer: 'Go to the Goals page, click "+ Add Goal", enter your target amount and date, and start tracking your progress.',
-    },
-    {
-      question: 'How do I manage bills?',
-      answer: 'Navigate to Bills & Subscriptions page, add your recurring bills, and track their due dates.',
-    },
-  ];
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-      <div className="flex">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 lg:ml-64 mt-16 p-4 sm:p-6 lg:p-8">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Help Center</h1>
-            <p className="text-gray-600 mt-2">Find answers to common questions</p>
+    <PageShell
+      title="Help Center"
+      badge="Support"
+      description="Browse quick answers or reach out to us directly—your expense coach is always nearby."
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">FAQs</h2>
+          <div className="divide-y divide-slate-100">
+            {faqs.map((faq) => (
+              <div key={faq.question} className="py-4">
+                <p className="text-sm font-semibold text-slate-900">{faq.question}</p>
+                <p className="text-sm text-slate-500 mt-1">{faq.answer}</p>
+              </div>
+            ))}
           </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold mb-4">Frequently Asked Questions</h2>
-            <div className="space-y-4">
-              {faqs.map((faq, index) => (
-                <div key={index} className="border-b border-gray-200 pb-4">
-                  <h3 className="font-semibold text-gray-900 mb-2">{faq.question}</h3>
-                  <p className="text-gray-600">{faq.answer}</p>
-                </div>
-              ))}
-            </div>
+        </div>
+        <div className="bg-white dark:bg-slate-800 rounded-3xl border border-slate-100 p-6 shadow-sm space-y-4">
+          <h2 className="text-lg font-semibold text-slate-900">Contact us</h2>
+          <div className="border border-slate-100 rounded-2xl p-4">
+            <p className="text-xs text-slate-500 uppercase">Email</p>
+            <p className="text-sm font-semibold text-slate-900">support@expense.app</p>
           </div>
-        </main>
+          <div className="border border-slate-100 rounded-2xl p-4">
+            <p className="text-xs text-slate-500 uppercase">Live chat</p>
+            <p className="text-sm text-slate-500">Available 9am–9pm IST</p>
+          </div>
+        </div>
       </div>
-    </div>
+    </PageShell>
   );
 };
 
 export default Help;
-

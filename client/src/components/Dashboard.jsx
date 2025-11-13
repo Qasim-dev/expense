@@ -1,18 +1,32 @@
 import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { fetchExpenses, setShowForm, setEditingExpense, resetForm, setOnlineStatus, syncOfflineChanges } from '../store/slices/expenseSlice';
+import {
+  fetchExpenses,
+  setShowForm,
+  setEditingExpense,
+  resetForm,
+} from '../store/slices/expenseSlice';
 import { fetchGoals } from '../store/slices/goalSlice';
 import { fetchInvestments } from '../store/slices/investmentSlice';
-import { onOnline, onOffline, isOnline } from '../utils/indexedDB';
+import { fetchBills } from '../store/slices/billSlice';
+import { fetchIncome } from '../store/slices/incomeSlice';
 import Header from './layout/Header';
 import Sidebar from './layout/Sidebar';
 import SummaryCards from './dashboard/SummaryCards';
 import ExpenseCharts from './dashboard/ExpenseCharts';
 import ExpenseList from './ExpenseList';
 import ExpenseForm from './ExpenseForm';
+import HighlightBanner from './dashboard/HighlightBanner';
+import QuickActions from './dashboard/QuickActions';
+import FinancialPulse from './dashboard/FinancialPulse';
+import SmartFeed from './dashboard/SmartFeed';
+import UpcomingBills from './dashboard/UpcomingBills';
+import Modal from './ui/Modal';
 
 const Dashboard = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { expenses, loading, error, showForm } = useAppSelector((state) => state.expenses);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
@@ -20,29 +34,8 @@ const Dashboard = () => {
     dispatch(fetchExpenses());
     dispatch(fetchGoals());
     dispatch(fetchInvestments());
-    
-    // Monitor online/offline status
-    dispatch(setOnlineStatus(isOnline()));
-    
-    const handleOnline = () => {
-      dispatch(setOnlineStatus(true));
-      dispatch(syncOfflineChanges());
-      dispatch(fetchExpenses());
-      dispatch(fetchGoals());
-      dispatch(fetchInvestments());
-    };
-    
-    const handleOffline = () => {
-      dispatch(setOnlineStatus(false));
-    };
-    
-    onOnline(handleOnline);
-    onOffline(handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    dispatch(fetchBills());
+    dispatch(fetchIncome());
   }, [dispatch]);
 
   const handleAddExpense = () => {
@@ -59,53 +52,90 @@ const Dashboard = () => {
     dispatch(resetForm());
   };
 
+  const handleGoToGoals = () => navigate('/goals');
+  const handleGoToBills = () => navigate('/bills');
+  const handleLogIncome = () => navigate('/income');
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen ">
       <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
       <div className="flex">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 lg:ml-64 mt-16 p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 lg:ml-64 mt-5 px-4 sm:px-6 lg:px-8 pb-8">
           {loading && expenses.length === 0 ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-xl text-gray-500">Loading expenses...</div>
             </div>
           ) : (
-            <>
-              {/* Summary Cards */}
-              <SummaryCards />
+            <div className="space-y-6 max-w-6xl mx-auto">
+              <div className="space-y-6">
+                <HighlightBanner onAddExpense={handleAddExpense} />
 
-              {/* Charts */}
-              <ExpenseCharts />
+                <QuickActions
+                  onLogExpense={handleAddExpense}
+                  onLogIncome={handleLogIncome}
+                  onAddGoal={handleGoToGoals}
+                  onSplitBill={handleGoToBills}
+                />
 
-              {/* Recent Expenses */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Recent Expenses</h3>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={handleAddExpense}
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      + Add Expense
-                    </button>
-                    <select className="text-xs border border-gray-200 rounded px-2 py-1">
-                      <option>Recent</option>
-                    </select>
-                  </div>
-                </div>
-                {showForm ? (
-                  <ExpenseForm onSave={handleSaveExpense} onCancel={handleCancelForm} />
-                ) : (
-                  <ExpenseList />
-                )}
+                {/* Summary Cards */}
+                <SummaryCards />
+
+                <FinancialPulse />
+
+                {/* Charts */}
+                <ExpenseCharts />
               </div>
 
-              {error && (
-                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                  {error}
-                </div>
-              )}
-            </>
+              {/* Recent Expenses + Side rail */}
+              <div className="grid gap-6 lg:grid-cols-3 mt-6">
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-sm border border-slate-100 p-6">
+                    <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-slate-500">Recent expenses</p>
+                        <h3 className="text-xl font-semibold text-slate-900">Ledger & activity</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button className="px-3 py-2 rounded-full text-xs font-medium border border-slate-200 text-slate-500">
+                          Filter
+                        </button>
+                        <button className="px-3 py-2 rounded-full text-xs font-medium border border-slate-200 text-slate-500">
+                          Export
+                        </button>
+                        <button
+                          onClick={handleAddExpense}
+                          className="px-5 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-full shadow-sm hover:bg-indigo-700 transition-colors"
+                        >
+                          + Add Expense
+                        </button>
+                      </div>
+                    </div>
+                <ExpenseList />
+              </div>
+            </div>
+            <div className="space-y-6">
+              <UpcomingBills />
+              <SmartFeed />
+            </div>
+          </div>
+
+          <Modal
+            open={showForm}
+            onClose={handleCancelForm}
+            title={showForm ? 'Add / Edit Expense' : ''}
+            subtitle="Log transactions and keep your ledger up to date."
+            footer={null}
+          >
+            <ExpenseForm onSave={handleSaveExpense} onCancel={handleCancelForm} />
+          </Modal>
+
+          {error && (
+            <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+              {error}
+            </div>
+          )}
+            </div>
           )}
         </main>
       </div>

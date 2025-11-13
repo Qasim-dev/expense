@@ -1,151 +1,122 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { deleteExpense, setEditingExpense } from '../store/slices/expenseSlice';
+import ConfirmDialog from './ui/ConfirmDialog';
+import { useCurrencyFormatter } from '../hooks/useCurrencyFormatter';
 
-const ExpenseList = () => {
+const categoryStyles = {
+  Food: 'bg-amber-50 text-amber-600',
+  Transport: 'bg-sky-50 text-sky-600',
+  Shopping: 'bg-fuchsia-50 text-fuchsia-600',
+  Bills: 'bg-rose-50 text-rose-600',
+  Entertainment: 'bg-emerald-50 text-emerald-600',
+  Healthcare: 'bg-pink-50 text-pink-600',
+  Education: 'bg-indigo-50 text-indigo-600',
+  Other: 'bg-slate-50 text-slate-600',
+};
+
+const ExpenseList = ({ data, emptyMessage }) => {
   const dispatch = useAppDispatch();
   const { expenses, loading } = useAppSelector((state) => state.expenses);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const { formatWhole } = useCurrencyFormatter();
 
   const handleEdit = (expense) => {
     dispatch(setEditingExpense(expense));
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this expense?')) {
-      return;
-    }
-
-    await dispatch(deleteExpense(id));
+  const handleDelete = (expense) => {
+    setPendingDelete(expense);
   };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
+    return date.toLocaleDateString('en-IN', {
       day: 'numeric',
+      month: 'short',
     });
   };
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
+  const list = data ?? expenses;
+  const message =
+    emptyMessage ||
+    (data
+      ? 'No expenses match your filters yet.'
+      : 'No expenses found. Add your first expense to get started!');
 
-  const getCategoryColor = (category) => {
-    const colors = {
-      Food: 'bg-yellow-100 text-yellow-800',
-      Transport: 'bg-blue-100 text-blue-800',
-      Shopping: 'bg-purple-100 text-purple-800',
-      Bills: 'bg-red-100 text-red-800',
-      Entertainment: 'bg-green-100 text-green-800',
-      Healthcare: 'bg-pink-100 text-pink-800',
-      Education: 'bg-indigo-100 text-indigo-800',
-      Other: 'bg-gray-100 text-gray-800',
-    };
-    return colors[category] || colors.Other;
-  };
-
-  if (expenses.length === 0) {
+  if (list.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        <svg
-          className="mx-auto h-12 w-12 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-          />
+      <div className="text-center py-12 text-slate-500">
+        <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
-        <p className="mt-4 text-sm">No expenses found. Add your first expense to get started!</p>
+        <p className="mt-4 text-sm">{message}</p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Title
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Category
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Amount
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Date
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Description
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {expenses.map((expense) => (
-              <tr key={expense._id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">
-                    {expense.title}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getCategoryColor(
-                      expense.category
-                    )}`}
-                  >
-                    {expense.category}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-semibold text-gray-900">
-                    {formatCurrency(expense.amount)}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {formatDate(expense.date)}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="text-sm text-gray-500 max-w-xs truncate">
-                    {expense.description || '-'}
-                  </div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    onClick={() => handleEdit(expense)}
-                    className="text-indigo-600 hover:text-indigo-900 mr-4"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDelete(expense._id)}
-                    disabled={loading}
-                    className="text-red-600 hover:text-red-900 disabled:opacity-50"
-                  >
-                    {loading ? 'Deleting...' : 'Delete'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-      </table>
+    <div className="space-y-3">
+      {list.map((expense) => {
+        const categoryClass = categoryStyles[expense.category] || categoryStyles.Other;
+        return (
+          <div
+            key={expense._id}
+            className="flex flex-wrap items-center justify-between gap-4 border border-slate-100 dark:border-slate-700 rounded-2xl p-4 bg-white dark:bg-slate-800 hover:shadow-md transition-shadow"
+          >
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-sm font-semibold ${categoryClass}`}>
+                {expense.title?.charAt(0)?.toUpperCase() || 'R'}
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-900">{expense.title}</p>
+                <p className="text-xs text-slate-500">
+                  {expense.category} | {formatDate(expense.date)}
+                </p>
+                <p className="text-xs text-slate-400 max-w-xs">{expense.description || 'No description provided'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 ml-auto">
+              <div className="text-right">
+                <p className="text-lg font-semibold text-slate-900">{formatWhole(expense.amount)}</p>
+                {expense.mode && <p className="text-xs text-slate-400">{expense.mode}</p>}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleEdit(expense)}
+                  className="px-3 py-1 rounded-full text-xs font-medium border border-slate-200 text-slate-600 hover:text-indigo-600 hover:border-indigo-200"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => handleDelete(expense)}
+                  disabled={loading}
+                  className="px-3 py-1 rounded-full text-xs font-medium border border-transparent text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={async () => {
+          if (pendingDelete) {
+            await dispatch(deleteExpense(pendingDelete._id));
+            setPendingDelete(null);
+          }
+        }}
+        loading={loading}
+        title="Delete expense?"
+        message={`This will permanently remove "${pendingDelete?.title}".`}
+        confirmLabel="Delete"
+      />
     </div>
   );
 };
 
 export default ExpenseList;
-

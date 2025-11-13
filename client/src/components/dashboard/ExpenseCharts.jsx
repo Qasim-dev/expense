@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -11,73 +11,84 @@ import {
   Legend,
 } from 'chart.js';
 import { useAppSelector } from '../../store/hooks';
+import { useCurrencyFormatter } from '../../hooks/useCurrencyFormatter';
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
+
+const ranges = [
+  { id: '3m', label: '3M' },
+  { id: '6m', label: '6M' },
+  { id: '12m', label: '12M' },
+];
 
 const ExpenseCharts = () => {
   const { expenses } = useAppSelector((state) => state.expenses);
+  const [activeRange, setActiveRange] = useState('6m');
+  const { format, formatWhole } = useCurrencyFormatter();
 
-  // Calculate monthly expenses
-  const monthlyData = useMemo(() => {
+  const monthlyDataset = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentYear = new Date().getFullYear();
-    const monthlyTotals = new Array(12).fill(0);
+    const totals = new Array(12).fill(0);
 
     expenses.forEach((expense) => {
       const date = new Date(expense.date);
       if (date.getFullYear() === currentYear) {
-        monthlyTotals[date.getMonth()] += expense.amount;
+        totals[date.getMonth()] += expense.amount;
       }
     });
 
-    // Get last 6 months
-    const currentMonth = new Date().getMonth();
-    const last6Months = [];
-    const last6MonthsData = [];
-
-    for (let i = 5; i >= 0; i--) {
-      const monthIndex = (currentMonth - i + 12) % 12;
-      last6Months.push(months[monthIndex]);
-      last6MonthsData.push(monthlyTotals[monthIndex]);
-    }
-
-    return { labels: last6Months, data: last6MonthsData };
+    return { labels: months, data: totals };
   }, [expenses]);
 
-  // Calculate category expenses
-  const categoryData = useMemo(() => {
-    const categoryTotals = {};
-    expenses.forEach((expense) => {
-      categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.amount;
-    });
+  const filteredMonthly = useMemo(() => {
+    const count = activeRange === '12m' ? 12 : activeRange === '6m' ? 6 : 3;
+    return {
+      labels: monthlyDataset.labels.slice(-count),
+      data: monthlyDataset.data.slice(-count),
+    };
+  }, [monthlyDataset, activeRange]);
 
-    const sortedCategories = Object.entries(categoryTotals)
+  const categoryData = useMemo(() => {
+    const categoryTotals = expenses.reduce((acc, expense) => {
+      const key = expense.category || 'Other';
+      acc[key] = (acc[key] || 0) + expense.amount;
+      return acc;
+    }, {});
+
+    const sorted = Object.entries(categoryTotals)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 6);
+      .slice(0, 5);
 
     return {
-      labels: sortedCategories.map(([category]) => category),
-      data: sortedCategories.map(([, amount]) => amount),
+      labels: sorted.map(([category]) => category),
+      data: sorted.map(([, amount]) => amount),
     };
   }, [expenses]);
 
+  const totalCategory = categoryData.data.reduce((sum, value) => sum + value, 0);
+
+  const gradientBackground = (context) => {
+    const chart = context.chart;
+    const { ctx, chartArea } = chart;
+    if (!chartArea) {
+      return 'rgba(99, 102, 241, 0.5)';
+    }
+    const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+    gradient.addColorStop(0, 'rgba(129, 140, 248, 0.1)');
+    gradient.addColorStop(1, 'rgba(99, 102, 241, 0.8)');
+    return gradient;
+  };
+
   const barChartData = {
-    labels: monthlyData.labels,
+    labels: filteredMonthly.labels,
     datasets: [
       {
         label: 'Expenses',
-        data: monthlyData.data,
-        backgroundColor: 'rgba(79, 70, 229, 0.8)',
-        borderColor: 'rgba(79, 70, 229, 1)',
-        borderWidth: 1,
+        data: filteredMonthly.data,
+        backgroundColor: gradientBackground,
+        borderRadius: 18,
+        barThickness: 26,
       },
     ],
   };
@@ -87,28 +98,45 @@ const ExpenseCharts = () => {
     datasets: [
       {
         data: categoryData.data,
-        backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(249, 115, 22, 0.8)',
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(168, 85, 247, 0.8)',
-          'rgba(236, 72, 153, 0.8)',
-          'rgba(20, 184, 166, 0.8)',
-        ],
-        borderColor: [
-          'rgba(59, 130, 246, 1)',
-          'rgba(249, 115, 22, 1)',
-          'rgba(34, 197, 94, 1)',
-          'rgba(168, 85, 247, 1)',
-          'rgba(236, 72, 153, 1)',
-          'rgba(20, 184, 166, 1)',
-        ],
-        borderWidth: 2,
+        backgroundColor: ['#818CF8', '#F472B6', '#FBBF24', '#34D399', '#FB7185'],
+        borderWidth: 6,
+        borderColor: '#FFFFFF',
       },
     ],
   };
 
-  const chartOptions = {
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (context) => format(context.parsed.y || 0),
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#94a3b8', font: { size: 11 } },
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: {
+            callback: (value) => format(value),
+            color: '#94a3b8',
+            font: { size: 11 },
+          },
+        },
+      },
+    }),
+    [format]
+  );
+
+  const doughnutOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -116,48 +144,31 @@ const ExpenseCharts = () => {
         display: false,
       },
     },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          callback: function (value) {
-            return '₹' + value.toLocaleString('en-IN');
-          },
-        },
-      },
-    },
-  };
-
-  const doughnutOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'right',
-        labels: {
-          padding: 15,
-          usePointStyle: true,
-        },
-      },
-    },
+    cutout: '70%',
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-      {/* Monthly Expenses Chart */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Monthly Expenses</h3>
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-green-600 flex items-center">
-              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-              </svg>
-              6% more than last month
-            </span>
-            <select className="text-xs border border-gray-200 rounded px-2 py-1">
-              <option>Recent</option>
-            </select>
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="lg:col-span-3 bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm backdrop-blur">
+        <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Monthly expenses</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Trend overview</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {ranges.map((range) => (
+              <button
+                key={range.id}
+                onClick={() => setActiveRange(range.id)}
+                className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  activeRange === range.id
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'border border-slate-200 text-slate-500 dark:text-slate-300 dark:border-slate-700'
+                }`}
+              >
+                {range.label}
+              </button>
+            ))}
           </div>
         </div>
         <div className="h-64">
@@ -165,31 +176,38 @@ const ExpenseCharts = () => {
         </div>
       </div>
 
-      {/* Top Category Chart */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="lg:col-span-2 bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm backdrop-blur">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Top Category</h3>
-          <select className="text-xs border border-gray-200 rounded px-2 py-1">
-            <option>Recent</option>
-          </select>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Top categories</p>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Spending mix</h3>
+          </div>
+          <span className="text-xs text-slate-400 dark:text-slate-500">{categoryData.labels.length} categories</span>
         </div>
-        <div className="h-64">
-          <Doughnut data={doughnutChartData} options={doughnutOptions} />
+        <div className="relative h-64 flex items-center justify-center">
+          <div className="w-48 h-48">
+            <Doughnut data={doughnutChartData} options={doughnutOptions} />
+          </div>
+          <div className="absolute text-center">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Tracked</p>
+            <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100">{formatWhole(totalCategory)}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500">last period</p>
+          </div>
         </div>
         <div className="mt-4 space-y-2">
           {categoryData.labels.map((label, index) => (
-            <div key={index} className="flex items-center justify-between text-sm">
-              <div className="flex items-center space-x-2">
-                <div
+            <div key={label} className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span
                   className="w-3 h-3 rounded-full"
                   style={{
                     backgroundColor: doughnutChartData.datasets[0].backgroundColor[index],
                   }}
-                ></div>
-                <span className="text-gray-600">{label}</span>
+                />
+                <span className="text-slate-600 dark:text-slate-300">{label}</span>
               </div>
-              <span className="font-semibold text-gray-900">
-                ₹{categoryData.data[index].toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              <span className="font-semibold text-slate-900 dark:text-slate-100">
+                {formatWhole(categoryData.data[index] || 0)}
               </span>
             </div>
           ))}
@@ -200,4 +218,3 @@ const ExpenseCharts = () => {
 };
 
 export default ExpenseCharts;
-

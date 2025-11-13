@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { createExpense, updateExpense, clearError } from '../store/slices/expenseSlice';
+import Select from './ui/Select';
 
 const ExpenseForm = ({ onSave, onCancel }) => {
   const dispatch = useAppDispatch();
@@ -78,34 +79,31 @@ const ExpenseForm = ({ onSave, onCancel }) => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4">
-        {editingExpense ? 'Edit Expense' : 'Add New Expense'}
-      </h2>
+    <>
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-rose-50 border border-rose-100 text-rose-600 px-4 py-3 rounded-2xl mb-4">
           {error}
         </div>
       )}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-            Title *
-          </label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            required
-            value={formData.title}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="amount" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="title" className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              Title *
+            </label>
+            <input
+              type="text"
+              id="title"
+              name="title"
+              required
+              value={formData.title}
+              onChange={handleChange}
+              className="mt-2 block w-full px-4 py-3 border border-slate-200 rounded-2xl  focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 text-sm"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="amount" className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
               Amount *
             </label>
             <input
@@ -117,21 +115,22 @@ const ExpenseForm = ({ onSave, onCancel }) => {
               step="0.01"
               value={formData.amount}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              className="mt-2 block w-full px-4 py-3 border border-slate-200 rounded-2xl  focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 text-sm"
             />
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="category" className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
               Category *
             </label>
-            <select
+            <Select
               id="category"
               name="category"
               required
               value={formData.category}
               onChange={handleChange}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
             >
               <option value="">Select category</option>
               {categories.map((cat) => (
@@ -139,27 +138,27 @@ const ExpenseForm = ({ onSave, onCancel }) => {
                   {cat}
                 </option>
               ))}
-            </select>
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="date" className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
+              Date *
+            </label>
+            <input
+              type="date"
+              id="date"
+              name="date"
+              required
+              value={formData.date}
+              onChange={handleChange}
+              className="mt-2 block w-full px-4 py-3 border border-slate-200 rounded-2xl  focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 text-sm"
+            />
           </div>
         </div>
 
         <div>
-          <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-            Date *
-          </label>
-          <input
-            type="date"
-            id="date"
-            name="date"
-            required
-            value={formData.date}
-            onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="description" className="block text-xs font-semibold text-slate-600 uppercase tracking-wide">
             Description
           </label>
           <textarea
@@ -168,15 +167,15 @@ const ExpenseForm = ({ onSave, onCancel }) => {
             rows="3"
             value={formData.description}
             onChange={handleChange}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+            className="mt-2 block w-full px-4 py-3 border border-slate-200 rounded-2xl  focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 text-sm"
           />
         </div>
 
-        <div className="flex space-x-4">
+        <div className="flex flex-col md:flex-row gap-3">
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            className="flex-1 bg-indigo-600 text-white px-4 py-3 rounded-2xl font-semibold text-sm hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
           >
             {loading ? 'Saving...' : editingExpense ? 'Update Expense' : 'Add Expense'}
           </button>
@@ -184,14 +183,14 @@ const ExpenseForm = ({ onSave, onCancel }) => {
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              className="flex-1  text-slate-700 px-4 py-3 rounded-2xl font-semibold text-sm border border-slate-200 hover:bg-slate-50"
             >
               Cancel
             </button>
           )}
         </div>
       </form>
-    </div>
+    </>
   );
 };
 

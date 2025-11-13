@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, createAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import {
   saveExpenseToDB,
@@ -10,10 +10,20 @@ import {
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+export const setPendingSyncCount = createAction('expenses/setPendingSyncCount');
+export const incrementPendingSync = createAction('expenses/incrementPendingSync');
+export const decrementPendingSync = createAction('expenses/decrementPendingSync');
+
 // Helper to get user ID from auth state
 const getUserId = (getState) => {
   const user = getState().auth.user;
   return user?.id || user?._id;
+};
+
+const stampSyncTime = (state) => {
+  if (state.isOnline) {
+    state.lastSyncedAt = new Date().toISOString();
+  }
 };
 
 // Async thunks with offline support
@@ -60,7 +70,7 @@ export const fetchExpenses = createAsyncThunk(
 
 export const createExpense = createAsyncThunk(
   'expenses/createExpense',
-  async (expenseData, { rejectWithValue, getState }) => {
+  async (expenseData, { rejectWithValue, getState, dispatch }) => {
     const userId = getUserId(getState);
     
     try {
@@ -91,6 +101,7 @@ export const createExpense = createAsyncThunk(
             type: 'CREATE_EXPENSE',
             payload: expenseData,
           });
+          dispatch(incrementPendingSync());
         }
         
         return tempExpense;
@@ -111,6 +122,7 @@ export const createExpense = createAsyncThunk(
           type: 'CREATE_EXPENSE',
           payload: expenseData,
         });
+        dispatch(incrementPendingSync());
         
         return tempExpense;
       }
@@ -121,7 +133,7 @@ export const createExpense = createAsyncThunk(
 
 export const updateExpense = createAsyncThunk(
   'expenses/updateExpense',
-  async ({ id, expenseData }, { rejectWithValue, getState }) => {
+  async ({ id, expenseData }, { rejectWithValue, getState, dispatch }) => {
     const userId = getUserId(getState);
     
     try {
@@ -151,6 +163,7 @@ export const updateExpense = createAsyncThunk(
             type: 'UPDATE_EXPENSE',
             payload: { id, expenseData },
           });
+          dispatch(incrementPendingSync());
         }
         
         return updatedExpense;
@@ -171,6 +184,7 @@ export const updateExpense = createAsyncThunk(
           type: 'UPDATE_EXPENSE',
           payload: { id, expenseData },
         });
+        dispatch(incrementPendingSync());
         
         return updatedExpense;
       }
@@ -181,7 +195,7 @@ export const updateExpense = createAsyncThunk(
 
 export const deleteExpense = createAsyncThunk(
   'expenses/deleteExpense',
-  async (id, { rejectWithValue, getState }) => {
+  async (id, { rejectWithValue, getState, dispatch }) => {
     const userId = getUserId(getState);
     
     try {
@@ -202,6 +216,7 @@ export const deleteExpense = createAsyncThunk(
             type: 'DELETE_EXPENSE',
             payload: { id },
           });
+          dispatch(incrementPendingSync());
         }
         
         return id;
@@ -214,6 +229,7 @@ export const deleteExpense = createAsyncThunk(
           type: 'DELETE_EXPENSE',
           payload: { id },
         });
+        dispatch(incrementPendingSync());
         return id;
       }
       return rejectWithValue(error.response?.data?.message || 'Failed to delete expense');
@@ -224,9 +240,18 @@ export const deleteExpense = createAsyncThunk(
 // Sync offline changes when coming back online
 export const syncOfflineChanges = createAsyncThunk(
   'expenses/syncOfflineChanges',
-  async (_, { getState, dispatch }) => {
+  async (_, { dispatch }) => {
     const { getSyncQueue, removeFromSyncQueue } = await import('../../utils/indexedDB');
     const queue = await getSyncQueue();
+    dispatch(setPendingSyncCount(queue.length));
+
+    let incomeActionsModule = null;
+    const ensureIncomeActions = async () => {
+      if (!incomeActionsModule) {
+        incomeActionsModule = await import('./incomeSlice');
+      }
+      return incomeActionsModule;
+    };
     
     for (const item of queue) {
       try {
@@ -236,8 +261,18 @@ export const syncOfflineChanges = createAsyncThunk(
           await dispatch(updateExpense(item.payload));
         } else if (item.type === 'DELETE_EXPENSE') {
           await dispatch(deleteExpense(item.payload.id));
+        } else if (item.type === 'CREATE_INCOME') {
+          const { createIncome } = await ensureIncomeActions();
+          await dispatch(createIncome(item.payload));
+        } else if (item.type === 'UPDATE_INCOME') {
+          const { updateIncome } = await ensureIncomeActions();
+          await dispatch(updateIncome(item.payload));
+        } else if (item.type === 'DELETE_INCOME') {
+          const { deleteIncome } = await ensureIncomeActions();
+          await dispatch(deleteIncome(item.payload.id));
         }
         await removeFromSyncQueue(item.id);
+        dispatch(decrementPendingSync());
       } catch (error) {
         console.error('Failed to sync item:', error);
       }
@@ -253,7 +288,9 @@ const expenseSlice = createSlice({
     error: null,
     showForm: false,
     editingExpense: null,
-    isOnline: navigator.onLine,
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    pendingSyncCount: 0,
+    lastSyncedAt: null,
   },
   reducers: {
     setShowForm: (state, action) => {
@@ -276,6 +313,15 @@ const expenseSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(setPendingSyncCount, (state, action) => {
+        state.pendingSyncCount = Math.max(0, action.payload || 0);
+      })
+      .addCase(incrementPendingSync, (state) => {
+        state.pendingSyncCount += 1;
+      })
+      .addCase(decrementPendingSync, (state) => {
+        state.pendingSyncCount = Math.max(0, state.pendingSyncCount - 1);
+      })
       // Fetch expenses
       .addCase(fetchExpenses.pending, (state) => {
         state.loading = true;
@@ -285,6 +331,7 @@ const expenseSlice = createSlice({
         state.loading = false;
         state.expenses = action.payload;
         state.error = null;
+        stampSyncTime(state);
       })
       .addCase(fetchExpenses.rejected, (state, action) => {
         state.loading = false;
@@ -305,6 +352,7 @@ const expenseSlice = createSlice({
         state.showForm = false;
         state.editingExpense = null;
         state.error = null;
+        stampSyncTime(state);
       })
       .addCase(createExpense.rejected, (state, action) => {
         state.loading = false;
@@ -326,6 +374,7 @@ const expenseSlice = createSlice({
         state.showForm = false;
         state.editingExpense = null;
         state.error = null;
+        stampSyncTime(state);
       })
       .addCase(updateExpense.rejected, (state, action) => {
         state.loading = false;
@@ -342,6 +391,7 @@ const expenseSlice = createSlice({
           (expense) => expense._id !== action.payload
         );
         state.error = null;
+        stampSyncTime(state);
       })
       .addCase(deleteExpense.rejected, (state, action) => {
         state.loading = false;

@@ -7,6 +7,7 @@ import expenseRoutes from './routes/expenses.js';
 import billRoutes from './routes/bills.js';
 import goalRoutes from './routes/goals.js';
 import investmentRoutes from './routes/investments.js';
+import incomeRoutes from './routes/income.js';
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/bills', billRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/investments', investmentRoutes);
+app.use('/api/income', incomeRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

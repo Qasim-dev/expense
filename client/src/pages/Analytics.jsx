@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react';
-import { useAppSelector } from '../store/hooks';
-import Header from '../components/layout/Header';
-import Sidebar from '../components/layout/Sidebar';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import { fetchExpenses } from '../store/slices/expenseSlice';
+import PageShell from '../components/layout/PageShell';
 import { Bar, Pie } from 'react-chartjs-2';
+import { useCurrencyFormatter } from '../hooks/useCurrencyFormatter';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -17,27 +18,43 @@ import {
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Title, Tooltip, Legend);
 
 const Analytics = () => {
-  const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const dispatch = useAppDispatch();
   const { expenses } = useAppSelector((state) => state.expenses);
+  const { format } = useCurrencyFormatter();
+  const [sliceCount, setSliceCount] = useState(5);
+
+  useEffect(() => {
+    dispatch(fetchExpenses());
+  }, [dispatch]);
 
   const categoryData = useMemo(() => {
     const categoryTotals = {};
     expenses.forEach((expense) => {
       categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + expense.amount;
     });
-
     const sorted = Object.entries(categoryTotals).sort(([, a], [, b]) => b - a);
+    const limited = sliceCount === 'all' ? sorted : sorted.slice(0, sliceCount);
     return {
-      labels: sorted.map(([cat]) => cat),
-      data: sorted.map(([, amount]) => amount),
+      labels: limited.map(([cat]) => cat),
+      data: limited.map(([, amount]) => amount),
+      totalCategories: sorted.length,
+      highestCategory: sorted[0]?.[0] || 'N/A',
+      highestValue: sorted[0]?.[1] || 0,
+      averagePerCategory: sorted.length
+        ? sorted.reduce((sum, [, amount]) => sum + amount, 0) / sorted.length
+        : 0,
     };
-  }, [expenses]);
+  }, [expenses, sliceCount]);
+
+  const handleSliceChange = (value) => {
+    setSliceCount(value === 'all' ? 'all' : Number(value));
+  };
 
   const barData = {
     labels: categoryData.labels,
     datasets: [
       {
-        label: 'Expenses by Category',
+        label: 'Expenses by category',
         data: categoryData.data,
         backgroundColor: 'rgba(79, 70, 229, 0.8)',
         borderColor: 'rgba(79, 70, 229, 1)',
@@ -63,82 +80,95 @@ const Analytics = () => {
     ],
   };
 
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top',
+  const chartOptions = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'top',
+        },
       },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          callback: function (value) {
-            return '₹' + value.toLocaleString('en-IN');
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => format(value),
           },
         },
       },
+    }),
+    [format]
+  );
+
+  const stats = [
+    {
+      label: 'Highest category',
+      value: categoryData.labels[0] || 'N/A',
+      helper: format(categoryData.highestValue || 0),
     },
-  };
+    {
+      label: 'Total categories',
+      value: categoryData.totalCategories,
+      helper: 'active this period',
+    },
+    {
+      label: 'Average per category',
+      value: format(categoryData.averagePerCategory),
+      helper: 'balanced mix',
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
-      <div className="flex">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 lg:ml-64 mt-16 p-4 sm:p-6 lg:p-8">
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-            <p className="text-gray-600 mt-2">Detailed analysis of your expenses</p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-semibold mb-4">Category Breakdown (Bar)</h2>
-              <div className="h-64">
-                <Bar data={barData} options={chartOptions} />
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-semibold mb-4">Category Distribution (Pie)</h2>
-              <div className="h-64">
-                <Pie data={pieData} options={{ responsive: true, maintainAspectRatio: false }} />
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold mb-4">Detailed Statistics</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">Highest Category</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {categoryData.labels[0] || 'N/A'}
-                </p>
-                <p className="text-sm text-gray-500">
-                  ₹{categoryData.data[0]?.toLocaleString('en-IN') || '0'}
-                </p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">Total Categories</p>
-                <p className="text-xl font-bold text-gray-900">{categoryData.labels.length}</p>
-              </div>
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">Average per Category</p>
-                <p className="text-xl font-bold text-gray-900">
-                  ₹{categoryData.data.length > 0 ? (categoryData.data.reduce((a, b) => a + b, 0) / categoryData.data.length).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </main>
+    <PageShell
+      title="Analytics"
+      badge="Deep Dive"
+      description="Compare how each category contributes to your overall spend and spot outliers instantly."
+    >
+      <div className="flex flex-wrap justify-end gap-2 text-xs">
+        {['5', '10', 'all'].map((option) => (
+          <button
+            key={option}
+            onClick={() => handleSliceChange(option)}
+            className={`px-3 py-1.5 rounded-full border transition ${
+              String(sliceCount) === option
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                : 'border-slate-200 text-slate-500 dark:text-slate-300 hover:border-indigo-200 dark:border-slate-700'
+            }`}
+          >
+            {option === 'all' ? 'All categories' : `Top ${option}`}
+          </button>
+        ))}
       </div>
-    </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm backdrop-blur">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Category breakdown</h2>
+          <div className="h-64">
+            <Bar data={barData} options={chartOptions} />
+          </div>
+        </div>
+        <div className="bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm backdrop-blur">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Distribution</h2>
+          <div className="h-64">
+            <Pie data={pieData} options={{ responsive: true, maintainAspectRatio: false }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-slate-900/60 rounded-3xl border border-slate-100 dark:border-slate-800 p-6 shadow-sm backdrop-blur">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">Detailed statistics</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {stats.map((item) => (
+            <div key={item.label} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 backdrop-blur">
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{item.label}</p>
+              <p className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mt-2">{item.value}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.helper}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </PageShell>
   );
 };
 
 export default Analytics;
-

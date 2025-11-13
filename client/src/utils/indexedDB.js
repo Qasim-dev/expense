@@ -3,12 +3,14 @@ const DB_NAME = 'ExpenseTrackerDB';
 const DB_VERSION = 1;
 const STORES = {
   EXPENSES: 'expenses',
+  INCOME: 'income',
   BILLS: 'bills',
   GOALS: 'goals',
   SYNC_QUEUE: 'syncQueue',
 };
 
 let db = null;
+let onlineStatus = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
 export const initDB = () => {
   return new Promise((resolve, reject) => {
@@ -33,6 +35,15 @@ export const initDB = () => {
         });
         expenseStore.createIndex('userId', 'userId', { unique: false });
         expenseStore.createIndex('date', 'date', { unique: false });
+      }
+
+      // Create income store
+      if (!database.objectStoreNames.contains(STORES.INCOME)) {
+        const incomeStore = database.createObjectStore(STORES.INCOME, {
+          keyPath: '_id',
+        });
+        incomeStore.createIndex('userId', 'userId', { unique: false });
+        incomeStore.createIndex('date', 'date', { unique: false });
       }
 
       // Create bills store
@@ -83,6 +94,18 @@ export const saveExpenseToDB = async (expense) => {
   });
 };
 
+export const saveIncomeToDB = async (income) => {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INCOME], 'readwrite');
+    const store = transaction.objectStore(STORES.INCOME);
+    const request = store.put(income);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
 export const getExpensesFromDB = async (userId) => {
   const database = await getDB();
   return new Promise((resolve, reject) => {
@@ -96,11 +119,36 @@ export const getExpensesFromDB = async (userId) => {
   });
 };
 
+export const getIncomeFromDB = async (userId) => {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INCOME], 'readonly');
+    const store = transaction.objectStore(STORES.INCOME);
+    const index = store.index('userId');
+    const request = index.getAll(userId);
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+};
+
 export const deleteExpenseFromDB = async (id) => {
   const database = await getDB();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction([STORES.EXPENSES], 'readwrite');
     const store = transaction.objectStore(STORES.EXPENSES);
+    const request = store.delete(id);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const deleteIncomeFromDB = async (id) => {
+  const database = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([STORES.INCOME], 'readwrite');
+    const store = transaction.objectStore(STORES.INCOME);
     const request = store.delete(id);
 
     request.onsuccess = () => resolve();
@@ -163,8 +211,10 @@ export const removeFromSyncQueue = async (id) => {
 };
 
 // Check if online
-export const isOnline = () => {
-  return navigator.onLine;
+export const isOnline = () => onlineStatus;
+
+export const setIndexedDBOnlineStatus = (value) => {
+  onlineStatus = value;
 };
 
 // Network status listener
